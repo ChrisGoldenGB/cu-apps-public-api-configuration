@@ -1,0 +1,722 @@
+openapi: 3.1.0
+x-stoplight:
+  id: v1ewbzj9sgw55
+info:
+  title: Public API
+  version: '1.0'
+  summary: The public API for L6
+  license:
+    name: MIT
+    identifier: CC-BY-4.0
+servers:
+  - url: 'http://localhost:3000/api/v1'
+    description: Development
+  - url: 'https://secure.lobby6.com/api/v1'
+    description: Production
+paths:
+  '/credit-union/{cu_uuid}':
+    parameters:
+      - schema:
+          type: string
+        name: cu_uuid
+        in: path
+        required: true
+        description: The credit union's UUID.
+    get:
+      summary: Get credit union information
+      tags: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  credit_union:
+                    $ref: '#/components/schemas/CreditUnion'
+                  warnings:
+                    $ref: '#/components/schemas/WarningList'
+              examples: {}
+        '403':
+          description: Credit Union Not Active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+        '404':
+          description: Credit Union Not Found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+      operationId: getCreditUnion
+      description: Retrieve the information of the credit union with the matching UUID.
+      parameters: []
+  '/credit-union/{cu_uuid}/location/{location_id}/available-times':
+    parameters:
+      - schema:
+          type: string
+        name: cu_uuid
+        in: path
+        required: true
+        description: The credit union's UUID.
+      - schema:
+          type: integer
+        name: location_id
+        in: path
+        required: true
+        description: The location's ID.
+    get:
+      summary: Get available appointment times
+      tags: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available_employees:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Employee'
+                  appointment_duration_in_minutes:
+                    type: integer
+                    description: The length of an appointment for the provided `appointment_reason_id`.
+                  available_dates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AvailableDate'
+                  warnings:
+                    $ref: '#/components/schemas/WarningList'
+              examples: {}
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Invalid appointment type:
+                  value:
+                    errors:
+                      - id: invalid-appointment-type
+                        message: The selected appointment type is not available.
+                Invalid appointment reason:
+                  value:
+                    errors:
+                      - id: invalid-appointment-reason
+                        message: The selected appointment type is not available.
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Inactive credit union:
+                  value:
+                    errors:
+                      - id: inactive-credit-union
+                        message: Credit union is not active.
+        '404':
+          description: Credit Union Not Found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Credit union not found:
+                  value:
+                    errors:
+                      - id: not-found-credit-union
+                        message: The credit union with the UUID specified was not found.
+                Location not found:
+                  value:
+                    errors:
+                      - id: not-found-location
+                        message: The location with the ID specified was not found for the given credit union.
+      operationId: getAvailableTimes
+      description: Fetch a list of available appointment times at the specified location.
+      parameters:
+        - schema:
+            type: integer
+            enum:
+              - 1
+              - 2
+              - 3
+          in: query
+          name: appointment_type_id
+          required: true
+          description: The ID of the appointment type. It should be an ID from one of the credit union's supported types.
+        - schema:
+            type: integer
+          in: query
+          name: appointment_reason_id
+          required: true
+          description: The ID of the appointment reason. It should be an ID from one of the credit union's supported reasons.
+        - schema:
+            type: string
+            example: America/Chicago
+          in: query
+          name: timezone
+          description: |
+            A time zone string from the TZ database: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List
+
+            Available times will be grouped by day, so this parameter is helpful when displaying appointment times in the member''s local time zone, for instance for remote phone or video appointments. It may be omitted to use the location''s configured time zone, as would be needed for in-person appointments.'
+        - schema:
+            type: integer
+            default: 2
+            maximum: 30
+            minimum: 1
+          in: query
+          name: appointment_window_in_days
+          description: The number of days in the future to look for available appointments.
+  '/credit-union/{cu_uuid}/location/{location_id}/appointment':
+    parameters:
+      - schema:
+          type: string
+        name: cu_uuid
+        in: path
+        required: true
+        description: The credit union's UUID.
+      - schema:
+          type: integer
+        name: location_id
+        in: path
+        required: true
+        description: The location's ID.
+    post:
+      summary: Create appointment
+      operationId: postCreateAppointment
+      responses:
+        '200':
+          description: ''
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  appointment:
+                    $ref: '#/components/schemas/Appointment'
+                  member:
+                    $ref: '#/components/schemas/Member'
+                  warnings:
+                    $ref: '#/components/schemas/WarningList'
+              examples:
+                Success:
+                  value:
+                    appointment:
+                      uuid: 14e693e1-2042-417c-a099-f07c938dd181
+                      start_time: 1661292000
+                      confirmation_id: "XVS190"
+                      duration_in_minutes: 30
+                      additional_details: I am looking to lower my interest rate on my existing mortgage.
+                      reason_id: 54
+                      scheduler_check_in_url: 'https://l6-demo.verticallines.net/scheduler.html?checkin=972b9ff0-a3dc-4b49-ae13-7c7883246e56'
+                      l6_appointment_details_url: 'https://secure.lobby6.com/lobby6/today/appointment/123055/view'
+                      location:
+                        id: 0
+                        name: string
+                        confirmation_id: string
+                        street_address: string
+                        city: string
+                        state: string
+                        zipcode: string
+                        timezone: string
+                        phone: string
+                        latitude: 0
+                        longitude: 0
+                        supported_appointment_type_ids:
+                          - 1
+                          - 3
+                        supported_category_ids:
+                          - 5
+                          - 10
+                          - 55
+                      employee:
+                        id: 547
+                        first_name: John
+                        last_name: Doe
+                        email: xyz@example.com
+                      type:
+                        id: 1
+                        name: string
+                      reason:
+                        id: 12
+                        name: Personal Loan
+                        details: string
+                        duration_in_minutes: 30
+                    member:
+                      name: John Doe
+                      email: abc@example.com
+                      formatted_phone: (123) 123-1234
+                    warnings:
+                      - id: string
+                        message: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Invalid appointment start time:
+                  value:
+                    errors:
+                      - id: invalid-appointment-start-time
+                        message: Appointments should be scheduled at least 15 minutes in advance.
+                Invalid video appointment start time:
+                  value:
+                    errors:
+                      - id: invalid-appointment-start-time
+                        message: Video appointments should be scheduled at least 24 hours in advance.
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Inactive credit union:
+                  value:
+                    errors:
+                      - id: inactive-credit-union
+                        message: Credit union is not active.
+        '404':
+          description: Credit Union Not Found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Credit union not found:
+                  value:
+                    errors:
+                      - id: not-found-credit-union
+                        message: The credit union with the UUID specified was not found.
+                Location not found:
+                  value:
+                    errors:
+                      - id: not-found-location
+                        message: The location with the ID specified was not found for the given credit union.
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Appointment scheduling conflict:
+                  value:
+                    errors:
+                      - id: conflict-appointment-start-time
+                        message: The selected appointment time slot is no longer available.
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    $ref: '#/components/schemas/ErrorList'
+              examples:
+                Failure to confirm employee availability:
+                  value:
+                    errors:
+                      - id: calendar-failure-availability-confirmation
+                        message: There was an error retrieving appointment availability.
+                Failure to create employee event:
+                  value:
+                    errors:
+                      - id: calendar-failure-event-creation
+                        message: There was an error reserving an appointment with John Doe.
+      description: Reserve an appointment.
+      requestBody:
+        $ref: '#/components/requestBodies/AppointmentReservation'
+components:
+  schemas:
+    Location:
+      title: Location
+      x-stoplight:
+        id: kq3krb2oagmld
+      type: object
+      description: A location/branch within a credit union.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        street_address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zipcode:
+          type: string
+        timezone:
+          type: string
+        phone:
+          type: string
+        latitude:
+          type: number
+          readOnly: true
+        longitude:
+          type: number
+          readOnly: true
+        supported_appointment_type_ids:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        supported_reason_ids:
+          type: array
+          items:
+            type: integer
+            example: 34
+    AppointmentType:
+      title: AppointmentType
+      x-stoplight:
+        id: gqxi6c4kkllpf
+      type: object
+      properties:
+        id:
+          type: integer
+          enum:
+            - 1
+            - 2
+            - 3
+        name:
+          type: string
+    AppointmentReason:
+      title: AppointmentReason
+      x-stoplight:
+        id: 7bqhll9cxkfow
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 3
+        name:
+          type: string
+        details:
+          type: string
+        duration_in_minutes:
+          type: integer
+        sort_order:
+          type: integer
+        location_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/Location'
+        category_id:
+          type: integer
+        category_name:
+          type: string
+    CreditUnion:
+      title: CreditUnion
+      x-stoplight:
+        id: zp2rzlosvr26w
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: This will be provided by the Credit Union or FTSI.
+          example: 14e693e1-2042-417c-a099-f07c938dd181
+          format: uuid
+          pattern: '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+          minLength: 36
+          maxLength: 36
+        name:
+          type: string
+          description: The name of the credit union.
+          example: Google FCU
+        logo_url:
+          type: string
+          description: The URL to the logo for the credit union.
+          example: 'https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png'
+        locations:
+          type: array
+          description: An array of credit union locations.
+          items:
+            $ref: '#/components/schemas/Location'
+        appointment_categories:
+          type: array
+          description: An array of the appointment categories and reasons for the credit union.
+          items:
+            $ref: '#/components/schemas/AppointmentCategory'
+        appointment_types:
+          type: array
+          description: An array of the different appointment types supported by the credit union.
+          items:
+            $ref: '#/components/schemas/AppointmentType'
+    AppointmentCategory:
+      title: AppointmentCategory
+      x-stoplight:
+        id: 2yz57nrqob31l
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        sort_order:
+          type: integer
+        appointment_reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppointmentReason'
+    ErrorList:
+      title: ErrorList
+      x-stoplight:
+        id: nv9awmnbx0q3i
+      type: array
+      items:
+        $ref: '#/components/schemas/Error'
+    Error:
+      title: Error
+      x-stoplight:
+        id: 5jpvlcesi60hl
+      type: object
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+    WarningList:
+      title: WarningList
+      x-stoplight:
+        id: cs22ww5k9syhv
+      type: array
+      items:
+        $ref: '#/components/schemas/Warning'
+    Warning:
+      title: Warning
+      x-stoplight:
+        id: fkbhpozqjg6ry
+      type: object
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+    Appointment:
+      title: Appointment
+      x-stoplight:
+        id: epsiz0a56c0s3
+      type: object
+      description: ''
+      properties:
+        uuid:
+          type: string
+          description: The unique identifier for the appointment.
+          example: 14e693e1-2042-417c-a099-f07c938dd181
+          format: uuid
+          pattern: '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+          minLength: 36
+          maxLength: 36
+          readOnly: true
+        start_time:
+          type: integer
+          example: 1661292000
+          description: A unix timestamp corresponding to the beginning of the appointment being scheduled. Appointments should be scheduled 15 minutes or more in advance. Video appointments require 24 hours.
+        duration_in_minutes:
+          type: integer
+          example: 30
+          description: The expected length of the appointment in minutes.
+          readOnly: true
+        type_id:
+          type: integer
+          description: The ID of the appointment type. It should be an ID from one of the credit union's supported types.
+          example: 41
+          writeOnly: true
+        additional_details:
+          type: string
+          description: Any additional details about the appointment that the member provided when scheduling.
+          example: I am looking to lower my interest rate on my existing mortgage.
+        employee_id:
+          type: integer
+          description: The ID of the employee the appointment will be scheduled with. It should match one of the credit union's employees.
+          example: 352
+          writeOnly: true
+        reason_id:
+          type: integer
+          description: The ID of the appointment reason. It should be an ID from one of the credit union's supported reasons.
+          example: 54
+          writeOnly: true
+        scheduler_check_in_url:
+          type: string
+          format: uri
+          example: 'https://l6-demo.verticallines.net/scheduler.html?checkin=972b9ff0-a3dc-4b49-ae13-7c7883246e56'
+          description: 'The URL the member can use to visit their online check-in or cancellation page. The URL will incorporate the configured iframe target page, when set.'
+          readOnly: true
+        l6_appointment_details_url:
+          type: string
+          format: uri
+          example: 'https://secure.lobby6.com/lobby6/today/appointment/123055/view'
+          description: 'The URL the member can use to visit their online check-in or cancellation page. The URL will incorporate the configured iframe target page, when set.'
+          readOnly: true
+        location:
+          allOf:
+            - $ref: '#/components/schemas/Location'
+          readOnly: true
+        employee:
+          allOf:
+            - $ref: '#/components/schemas/Employee'
+          readOnly: true
+        type:
+          allOf:
+            - $ref: '#/components/schemas/AppointmentType'
+          readOnly: true
+        reason:
+          allOf:
+            - $ref: '#/components/schemas/AppointmentReason'
+          readOnly: true
+        confirmation_id:
+          type: string
+          pattern: '[A-Z0-9]{6}'
+          example: XV6C98
+          readOnly: true
+        location_id:
+          type: integer
+          example: 52
+          writeOnly: true
+      required:
+        - start_time
+    Member:
+      title: Member
+      x-stoplight:
+        id: 2na1xz628qaq5
+      type: object
+      properties:
+        name:
+          type: string
+          description: The member's full name.
+          example: John Doe
+        email:
+          type: string
+          description: The member's email address.
+          example: abc@example.com
+        phone:
+          type: string
+          example: '1234567890'
+          pattern: '[0-9]{10}'
+          writeOnly: true
+        formatted_phone:
+          type: string
+          example: (123) 123-1234
+          pattern: '\([0-9]{3}'
+          readOnly: true
+      required:
+        - name
+        - email
+    AvailableDate:
+      title: AvailableDate
+      x-stoplight:
+        id: fuutwj2ww7geb
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2022-08-23'
+          description: 'Available times are grouped by date. This date string indicates the date that the `available_times` fall under. This can be influenced by the `timezone` parameter. If not `timezone` is provided, the branch location''s configured time zone will be used.'
+          readOnly: true
+        available_times:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvailableTime'
+    AvailableTime:
+      title: AvailableTime
+      x-stoplight:
+        id: sqxsgljucua2u
+      type: object
+      description: ''
+      properties:
+        start:
+          type: integer
+          description: Unix timestamp representing the start time of the available time slot. Use in conjunction with the duration of the selected appointment reason.
+        available_employee_ids:
+          type: array
+          description: An array of employee IDs that are available for this available time slot.
+          items:
+            type: integer
+            example: 1661291100
+            readOnly: true
+          readOnly: true
+    Employee:
+      title: Employee
+      x-stoplight:
+        id: bk6ys8nv9wnl5
+      type: object
+      description: ''
+      properties:
+        id:
+          type: integer
+          example: 547
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: xyz@example.com
+  securitySchemes: {}
+  parameters: {}
+  requestBodies:
+    AppointmentReservation:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              member:
+                allOf:
+                  - $ref: '#/components/schemas/Member'
+                  - type: object
+                    required:
+                      - phone
+              appointment:
+                allOf:
+                  - $ref: '#/components/schemas/Appointment'
+                  - type: object
+                    required:
+                      - location_id
+                      - employee_id
+                      - reason_id
